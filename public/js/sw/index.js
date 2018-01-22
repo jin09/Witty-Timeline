@@ -1,5 +1,5 @@
 var staticCacheName = 'wittr-static-v2';
-
+//new vers
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(staticCacheName).then(function(cache) {
@@ -40,3 +40,9 @@ self.addEventListener('fetch', function(event) {
 
 // TODO: listen for the "message" event, and call
 // skipWaiting if you get the appropriate message
+self.addEventListener('message', function(event){
+    var obj = event.data;
+    if(obj.upgrade_sw){
+        self.skipWaiting();
+    }
+});
