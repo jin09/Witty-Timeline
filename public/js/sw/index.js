@@ -16,4 +16,16 @@ self.addEventListener('install', function(event) {
 self.addEventListener('fetch', function(event) {
   // TODO: respond with an entry from the cache if there is one.
   // If there isn't, fetch from the network.
+  event.respondWith(
+      caches.match(event.request).then(function(response){
+        if(response){
+          console.log('served from cache!!');
+          return response;
+        }
+        else{
+          console.log('served from network request');
+          return fetch(event.request);
+        }
+      })
+  );
 });
