@@ -9,19 +9,12 @@ function openDatabase() {
     return Promise.resolve();
   }
 
-  // TODO: return a promise for a database called 'wittr'
-  // that contains one objectStore: 'wittrs'
-  // that uses 'id' as its key
-  // and has an index called 'by-date', which is sorted
-  // by the 'time' property
-  var dbPromise = idb.open('wittr', 1, function(upgradeDb) {
-  switch(upgradeDb.oldVersion) {
-    case 0:
-      var messageStore = upgradeDb.createObjectStore('wittrs', { keyPath: 'id' });
-          messageStore.createIndex('by-date', 'time');
-    }
+  return idb.open('wittr', 1, function(upgradeDb) {
+    var store = upgradeDb.createObjectStore('wittrs', {
+      keyPath: 'id'
+    });
+    store.createIndex('by-date', 'time');
   });
-  return dbPromise;
 }
 
 export default function IndexController(container) {
@@ -29,9 +22,14 @@ export default function IndexController(container) {
   this._postsView = new PostsView(this._container);
   this._toastsView = new ToastsView(this._container);
   this._lostConnectionToast = null;
-  this._openSocket();
   this._dbPromise = openDatabase();
   this._registerServiceWorker();
+
+  var indexController = this;
+
+  this._showCachedMessages().then(function() {
+    indexController._openSocket();
+  });
 }
 
 IndexController.prototype._registerServiceWorker = function() {
@@ -66,6 +64,24 @@ IndexController.prototype._registerServiceWorker = function() {
     if (refreshing) return;
     window.location.reload();
     refreshing = true;
+  });
+};
+
+IndexController.prototype._showCachedMessages = function() {
+  var indexController = this;
+
+  return this._dbPromise.then(function(db) {
+    // if we're already showing posts, eg shift-refresh
+    // or the very first load, there's no point fetching
+    // posts from IDB
+    if (!db || indexController._postsView.showingPosts()) return;
+
+    // TODO: get all of the wittr message objects from indexeddb,
+    // then pass them to:
+    // indexController._postsView.addPosts(messages)
+    // in order of date, starting with the latest.
+    // Remember to return a promise that does all this,
+    // so the websocket isn't opened until you're done!
   });
 };
 
@@ -137,18 +153,15 @@ IndexController.prototype._openSocket = function() {
 // called when the web socket sends message data
 IndexController.prototype._onSocketMessage = function(data) {
   var messages = JSON.parse(data);
-  // console.log(messages);
-  // console.log(data);
+
   this._dbPromise.then(function(db) {
     if (!db) return;
-    // TODO: put each message into the 'wittrs'
-    // object store.
+
     var tx = db.transaction('wittrs', 'readwrite');
-    var messagestore = tx.objectStore('wittrs');
-    for(var i=0;i<messages.length;i++){
-      messagestore.put(messages[i]);
-    }
-    return tx.complete;
+    var store = tx.objectStore('wittrs');
+    messages.forEach(function(message) {
+      store.put(message);
+    });
   });
 
   this._postsView.addPosts(messages);
